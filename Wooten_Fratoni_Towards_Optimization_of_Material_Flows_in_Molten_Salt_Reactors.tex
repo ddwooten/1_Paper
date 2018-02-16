@@ -1,0 +1,897 @@
+\documentclass[]{elsarticle}
+
+% bold symbol shortcut
+\def\bm#1{\boldsymbol{#1}}
+
+\usepackage{lineno,hyperref}
+\modulolinenumbers[5]
+
+%For inclusion of figures
+\usepackage{graphicx}
+
+%For isotope notation
+\usepackage{mhchem}
+
+%For equation formatting
+\usepackage{amsmath}
+
+% math fonts
+\usepackage{amsfonts}
+
+%For sizing summations properly
+\usepackage{relsize}
+
+%For tables
+\usepackage{multirow}
+
+% For nice matrices
+\usepackage{blkarray}
+
+%For signalling my co-author
+\usepackage{xcolor}
+
+%For landscape tables
+\usepackage{pdflscape}
+
+%For footnotes in tables
+\usepackage{tablefootnote}
+
+%For appendicies
+\usepackage[page]{appendix}
+
+%For fixing floats in place
+\usepackage{float}
+
+% for mathfrak?
+\usepackage{eufrak}
+
+%for style!
+\def\j{\mathfrak{j}}
+
+\journal{Journal of Computational Physics}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+%% Elsevier bibliography styles
+%%%%%%%%%%%%%%%%%%%%%%%
+%% To change the style, put a % in front of the second line of the current style and
+%% remove the % from the second line of the style you would like to use.
+%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Numbered
+%\bibliographystyle{model1-num-names}
+
+%% Numbered without titles
+%\bibliographystyle{model1a-num-names}
+
+%% Harvard
+%\bibliographystyle{model2-names.bst}\biboptions{authoryear}
+
+%% Vancouver numbered
+%\usepackage{numcompress}\bibliographystyle{model3-num-names}
+
+%% Vancouver name/year
+%\usepackage{numcompress}\bibliographystyle{model4-names}\biboptions{authoryear}
+
+%% APA style
+%\bibliographystyle{model5-names}\biboptions{authoryear}
+
+%% AMA style
+%\usepackage{numcompress}\bibliographystyle{model6-num-names}
+
+%% `Elsevier LaTeX' style
+\bibliographystyle{elsarticle-num}
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{Towards Optimization of Material Flows in Molten Salt Nuclear Reactors}
+
+
+%% Group authors per affiliation:
+\author[ucb]{\corref{cor1}Daniel Wooten}
+\ead{danieldavidwooten@gmail.com}
+\author[ucb]{Massimiliano Fratoni}
+\address[ucb]{4155 Etcheverry Hall, MC 1730, University of California, Berkeley,
+    Berkeley, CA 94720-1730, United States}
+\cortext[cor1]{Corresponding Author}
+
+
+\begin{abstract}
+Molten salt reactors have seen a resurgence of interest in the last 20 years and
+yet the options available for fuel evolution modelling in many of these systems
+are few with many of them making course assumptions and many more being poorly
+documented. ADDER, the Advanced Dynamic Depletion Extension for Reprocessing,
+is a source code modification to the SERPENT 2 monte carlo reactor physics code
+which seeks to improve on many of the shortcomings found in the field of
+nuclear material evolution modelling. Specifically, ADDER provides an interface
+with which to define collections of elements, isotopes, and chemicals. ADDER
+provides a means to specify how these collections should interact within a
+SERPENT 2 material and how these collections may be moved in, out, and between
+SERPENT 2 materials. Furthermore, ADDER optimizes optional material flows based
+on user defined material constraints and user defined material flows. Two 
+specific material constraints that ADDER provides an interface for are
+limitations on the multiplication factor of a system in SERPENT 2 as well as
+limitations on the averaged and weighted oxidation state of a material in
+SERPENT 2. Taking all these considerations into account the optimization
+routines of ADDER provides optimized material flows  which are incorporated
+directly into the SERPENT 2 burnup routines. ADDER is expected to significantly
+advance the current state of molten salt reactor fuel evolution modelling and
+possibly other nuclear evolution modelling problems.
+\end{abstract}
+
+\begin{keyword}
+\texttt{MSR molten salt dynamics burnup optimization}
+\MSC[2010] 00-01\sep  99-00
+\end{keyword}
+
+\end{frontmatter}
+
+\linenumbers
+
+\section{Introduction} \label{sec:intro}
+Molten Salt Reactors (MSRs) have received scattered and intermittent attention
+from the global community for the past 70 years. Two MSRs have ever been built,
+the Aircraft Reactor Experiment and the Molten Salt Reactor Experiment, both
+in the United States though continued research efforts were shuttered in the
+1970s. Since the 1990s various pre-conceptual designs have been put forward
+by both governments and private industry as, once again, MSRs receive increased
+global attention. The Molten Salt Fast Reactor (MSFR) from the European Union,
+the Molten Salt Actinide Recycler and Transmuter from Russia, the 
+Chinese-designed Liquid Fueled Thorium Molten Salt Reactor, the
+FUJI series of reactors out of Japan, and a host of proposed privately designed
+reactors are all examples of such pre-conceptual designs.
+
+Despite this depth
+of efforts there are few tools available to researchers for nuclear fuel
+depletion simulation in molten salt, or even circulating fuel, systems. Those
+that do exist suffer various shortcomings - most commonly that few if any
+details are provided in literature concerning the methods themselves. 
+Many, if not most, of the methods
+proposed or implemented involve external linking-scripts such as those seen in
+\cite{jeong_development_2015}, \cite{mitachi_three-region_2007},
+\cite{nuttin_potential_2005},  \cite{ridley_method_2017}, and
+\cite{sheu_depletion_2013}. These scripts 
+join together a neutronics solver with a burnup solver. Many of these scripts
+tend to ''reprocess" the MSR fuel as well, modifying the material isotopics and 
+densities to
+reflect possible reactor operations. Linking-scripts, while quite flexible, pay
+a price both in computational time and in version complexity.
+Other common shortcomings include  
+reactor specific methods, such as those seen in \cite{aufiero_extended_2013} and
+\cite{ridley_method_2017}, and the use of rigid assumptions about fuel salt
+chemistry, such as those found in \cite{fiorina_molten_2013} and 
+\cite{ridley_method_2017}. Additionally, across many of the methods available
+today 
+there is a general lack of attention to the limits and demands of the chemistry
+of the fuel salt. Concerns such as the molar fraction of various salt species
+in relation to one another or the maintenance of the fuel salt redox potential are
+generally treated with hard-limits, upper cut-offs, and coarse assumptions.
+
+Clearly, a need exists within the MSR community for a more nuanced and
+system-agnostic fuel evolution suite. In this paper the methodology for such an
+approach is presented. Dubbed ADDER, the Advanced Dynamic Depletion
+Extension for Reprocessing, it is a suite of tools, agnostic in their
+preferred system, built into the monte-carlo reactor physics code SERPENT 2
+\cite{leppanen_serpent_nodate}.
+ADDER should not be thought of as an extension \textit{for} MSRs, as it's
+capabilities open possibilities beyond MSR research. Rather, ADDER is a
+``materials optimization" extension for SERPENT 2 with capabilities to address
+many of the shortcomings within the current MSR modelling environment. Right off
+the bat ADDER benefits from being a source-code modification to the extensive
+and widely-used SERPENT 2 code. The SERPENT 2 code already has a long list of
+papers attesting to its capabilities as both a neutronics modelling suite and
+as a nuclear depletion suite. With ADDER being directly integrated into the
+flow of the SERPENT 2 program all the concerns regarding linking-scripts fall
+away, but ADDER goes far beyond simply getting rid of a linking-script.
+
+ADDER brings to the users of SERPENT 2 the ability to define groups of elements,
+isotopes, and chemicals; the ability to define relationships between these 
+groups; and the ability to move these groups into, out-of, and between SERPENT 2
+materials. Furthermore, ADDER gives the users of SERPENT 2 the ability to set
+$k_{eff}$ targets, prescribe mass transfers within the system, and to set
+weighted oxidation state targets for materials. Bringing all of these
+capabilities together ADDER employs the COIN-OR linear optimization (CLP) 
+package to determine the material flows, as defined by the user, that will best 
+satisfy an optimization target set by the user \cite{lougee-heimer_common_2003}.
+ADDER does all of this as a source-code
+modification to SERPENT 2. With these capabilities ADDER brings to the MSR
+community a reactor-agnostic, fuel-salt-agnostic, material flows optimizer.
+While ADDER is no general-purpose chemistry code and certainly has no ability
+to perform tasks such as chemical phase determination it does bring the ability
+to quickly and easily describe the basic chemistry concerns of an MSR as well
+as the actions available to remedy these concerns to an extensive reactor
+modelling environment. 
+
+In section \ref{sec:structure} the components of ADDER will be introduced and elaborated
+upon as well as their specific applicability to MSR modelling. Following, in
+section REF\_NEEDED, the algorithmic underpinnings of ADDER will be elaborated
+upon followed up with concluding remarks.
+
+\section{Defining the Structure} \label{sec:structure}
+ADDER is composed of various structures and these structures bring functionality
+to ADDER. In this section these structures and their attributes are explored. In
+section \ref{sec:opt} how these structures fit together to fulfill the
+job of ADDER is shown.
+
+\subsection{Groups} \label{ssec:groups}
+The ``group" is an elementary structure in the ADDER framework. Before
+understanding what can be done with a group, what a group is must be understood.
+A group in ADDER is composed of a fixed set of elements, with or without
+specified isotopics, with fixed abundances relative to the group as a whole.
+A group could be made to specify that it is one part uranium and three parts
+chlorine - uranium tetrachloride. Furthermore, the uranium could be specified
+to be 4.95\% \ce{^{235}U} and 95.05\% \ce{^{238}U} - or left to assume
+whatever isotopics the host material may impart to it. 
+Finally, related to the group structure in ADDER, is the concept of free versus
+``controlled" elements and isotopes. In ADDER, for a given material, whether or
+not an element or isotope should be completely accounted for by the groups
+which possess these constituents or be allowed to have ``free" portions
+not locked up in the group structure is something that can be specified.
+
+With a set of groups assigned to a material in SERPENT 2 there are several means
+through which to define the relationships between the groups and between the
+material and the groups. To define relationships
+between the material and the groups a range of absolute abundances of a group
+in a material may be specified for an arbitrary number of groups. 
+To define relationships between groups in a SERPENT 2
+material a range of relative abundances between any two groups
+may be defined for an arbitrary number of group pairs. To facilitate modelling
+of chemical compounds with related and possibly interchangeable forms a group
+in ADDER may also be formed from the linear combination of any other groups
+previously defined. These three simple mechanisms can be combined to model
+various chemical situations and form a core component of the conditions for
+optimality placed on a material. 
+
+Say, for example, that a material is desired to have three to four times as
+much eutectic LiF - Be\ce{F2} (FLIBE) salt to uranium fluoride salts - both 
+uranium trifluoride and tetrafluoride. Additionally, it is desired that uranium
+tetrafluoride be more than 100 times as abundant as uranium trifluroide. Setting
+these as constraints for the material can be accomplished with four groups and
+2 relative abundance constraints. First the uranium trifluoride and tetrafluoride
+groups are defined followed by a one to one combination of the two uranium
+groups to form an overall ``uranium fluoride compounds" group. Of course a FLIBE
+salt group is made as well. A relative abundance constraint is placed between
+the FLIBE group and the ``uranium fluoride compounds" group and a relative
+constraint is placed between the two uranium fluoride salt groups. With those
+6 constructs a solubility constraint on a family of related compounds was put
+into effect. This is just once example of many restraints and conditions which
+can be modeled with the ADDER group structures and the relationships between
+them.
+
+\subsection{Oxidation tables} \label{ssec:oxi}
+In many nuclear fuel evolution scenarios a wide variety of elements are
+produced by nuclear processes. To ease the burden on the user for
+defining how all of these elements will bond with one another the ``oxidation
+table" structure is provided. In the oxidation table structure a complete list
+of elements with their expected average oxidation state in the desired
+material is given; optionally a weight may also be applied to any element. To complete this setup a material is also given a target
+oxidation state which the weighted average of the elemental oxidation states in
+the material should meet.
+It is suspected that this feature will greatly ease the
+burden on most MSR simulations as most proposed fuel salts have a dominant
+anion which bonds with near everything else to the exclusion of other
+compounds. Combining this tool with the principles from the Nernst equation,
+equation \ref{eq:nernst}, bounds for the average redox potential of a molten
+salt can be set - a key metric in controlling corrosion in molten salt systems.
+In equation \ref{eq:nernst} $\epsilon_{i}$ is the redox potential,
+$\epsilon_{i}^{o}$ is the redox potential in the standard state, R is the gas
+constant, T is the temperature, z is the number of electrons received by the
+oxidizing agent, $\j$ is Faraday's constant, $[oxid]$ is the activity of the oxidized species while $[red]$ is the activity of the reduced species.
+Conversions between
+activity and concentration are required but approximations may be sufficient -
+this task is considered far beyond the scope of ADDER and is left to the user.
+
+\begin{equation}
+\label{eq:nernst}
+    \epsilon_{i} = \epsilon_{i}^{o} + \frac{RT}{z \j}\ln\left(\frac{[oxid]}{[red]}\right)
+\end{equation}
+
+\subsection{Streams} \label{ssec:streams}
+The ``stream" is both the workhorse and the end-goal of ADDER.
+There are two classes of streams in ADDER. ``Group-class" streams are
+options. They represent pathways available to ADDER to move mass into, out of,
+and between SERPENT materials with the goal of bringing their compositions to an
+optimal state. ``Table-class" streams are prescriptive. They are directions to
+ADDER to move specific types and amounts of mass from and to specific materials
+ - irrespective of optimallity. All streams have a set of common attributes
+provided by the user; a source, a sink, and the behavior in time of the stream.
+For the majority of streams a source and a sink are optional, but one must be
+provided. Missing sources are treated as infinite supplies of whatever substance
+is needed, missing sinks are treated much like sinks - endless consumers of
+disposed mass. In terms of their behavior in time, ADDER
+supports three types of streams. Discrete type stream transfers happen
+between burnup steps as step changes. Continuous type stream transfers occur as
+a steady rate of mass transfer over the length of a burnup step. Proportional
+type streams modify the decay constant
+of isotopes, even to the point of making the decay constant a production
+constant if that is what is called for. Lastly, the user is given the option in
+ADDER to preserve the number of mols in a material - this option can be turned
+on or off by the user.
+
+Group-class streams have an additional attribute the user is required to set, 
+the ADDER group which defines the substance the stream will move. These streams
+are given no set amount of mass transfer. Rather, through its optimization 
+process
+ADDER determines the amount of mass transfer each group-class stream should
+have. Table-class streams have two additional attributes the user is required to
+set, the ADDER ``transfer" table to be used and a positive value, denoted
+$c^{s}$, the purpose 
+of which will be made clear in the following lines.
+Transfer tables in ADDER are user defined lists of selected elements
+and isotopes all of which have some value attached to them, denoted $c_{k}^{t}$.Multiplying the
+value from the transfer table with the value given in the table-class stream
+definition gives the fraction of the whole for an individual isotope or
+element that will be moved by the table-class stream over the burnup step for
+continuous and discrete type streams. For proportional type streams the value
+produced by this multiplication will be added to the decay constant of the
+appropriate isotopes, or subtracted given its sign. The value of splitting
+the table-class stream mass transfer rates into two numbers lies with MSR
+modelling. In many proposed MSR designs there is some fuel treatment procedure
+which is applied to some fraction of the fuel salt, represented by the value
+given in the table-class stream definition. This treatment procedure removes
+specific elements with differing effectiveness, as represented by the value
+given to each element and isotope contained in a transfer table.
+
+Streams, group-class or table-class, have clear applicability to MSR modelling.
+While ADDER's optimization routines, in this instance, should be thought of as
+the ``reactor
+operator" the streams represent those mass flows in and out of a reactor that
+the operator may plan such as an addition of lithium fluoride for maintaining
+a desired salt condition or the addition of \ce{^{233}U} for criticality
+control. Table-class streams provide a means not only to model possible
+fuel salt reprocessing options but also natural process which change the
+composition of fuel salts such as the escape of noble gas fission products. 
+Outside of MSR modelling streams find other applications ranging from geological
+repository modelling to fuel fabrication applications.
+
+\subsection{Reactivity control} \label{ssec:reactivity}
+Not all, but most, nuclear simulations are concerned with the multiplication
+factor of the system in question. A description of the restrictions and
+conditions placed
+upon a material in SERPENT 2 would not be complete without a mention to
+reactivity constraints. As such users may set system wide reactivity
+constraints through ADDER. In order to approximate the effects the streams will
+have on reactivity ADDER collects spectrum averaged neutron production cross
+sections, $\nu \Sigma_{f}$, for all isotopes in the materials ADDER is
+connected to. Leakage values, $p_{l}$, and absorption cross sections,
+$\Sigma_{a}$, are provided by SERPENT 2 and from equation \ref{eq:reac}
+$k_{eff}$ is approximated - summations over i are over all isotopes.
+
+\begin{equation}
+\label{eq:reac}
+k_{eff} = (1 - p_{l}) \frac{\sum\limits^{I} \nu_{i} \Sigma_{f}^{i}}{\sum\limits^{I} \Sigma_{a}^{i}}
+\end{equation}
+
+While equation \ref{eq:reac} is exact, $k_{eff}$ is only ever approximated;
+not just from the error inherent in monte-carlo simulations but from
+ignoring that every term in equation \ref{eq:reac} is non-linearlly dependant
+on composition. As such it is expected that the reactivity control feature of
+ADDER will only behave well for small changes in composition that do not have a
+large effect on the neutron flux. Finally, more of a limitation than an
+assumption, ADDER has no means to measure the effect on reactivity resulting
+from changes in one material interacting neutronincally with another. As such 
+ADDER's reactivity control feature only works in situations where one 
+material is the dominant driver of criticality in a system. While this could be
+limiting in many circumstances MSR modelling is not expected to be one of them.
+To address these shortcomings ADDER offer the user the option of setting the
+number of max iterations allowed per burnup step to determine the effects of
+ADDER's streams. At the end of each iteration a monte-carlo cross section
+calculation is repeated to assess the effects of ADDER's actions.
+
+\subsection{Material clusters}
+An overarching structure that serves as the primary means of organization in
+ADDER is a material cluster. Material clusters are created in ADDER when ADDER
+streams link materials together through being sources and sinks. ADDER
+automatically identifies material clusters that are created by the user's
+stream definitions. Material clusters are necessary if for no other reason than
+the equations that describe their nuclear evolution become coupled. 
+
+\section{Optimizing the Outcome} \label{sec:opt}
+Before considering an optimization method one should consider the constraints
+and governing equations. 
+
+\subsection{Group equations} \label{ssec:group_eq}
+Beginning with groups there are 2 principle relationships. The first is the
+atom balance equation describing a group's composition as seen in equation
+\ref{eq:group_def_ele} for the elemental balance and \ref{eq:group_def_iso} for
+the isotopic balance where $g_{i}$ is the fractional abundance of the 
+group in the host material, $f_{x}^{i}$ is the fractional abundance of 
+component $x$ in group $i$, $E_{j}^{f}$ is the fractional abundance of element
+$j$ in the same material as group $i$, and $I_{k}^{f}$ is the fractional 
+abundance of isotope $k$ in the same material as group $i$.
+
+\begin{equation}
+\label{eq:group_def_ele}
+g_{i} = \sum \limits_{j}^{J} f_{E_{j}^{f}}^{i} E_{j}^{f}
+\end{equation} 
+
+\begin{equation}
+\label{eq:group_def_iso}
+g_{i} = \sum \limits_{k}^{K} f_{I_{k}^{f}}^{i} I_{k}^{f}
+\end{equation}
+
+Considering the limits on the group's abundance within a material equations
+\ref{eq:group_def_ele} and \ref{eq:group_def_iso} become the inequalities seen
+in equations \ref{eq:group_def_ele_lim} and \ref{eq:group_def_iso_lim} where
+$b_{m}$ and $b_{M}$ are the lower and upper bound respectively.
+
+\begin{equation}
+\label{eq:group_def_ele_lim}
+b_m \leq \sum \limits_{j}^{J} f_{E_{j}^{f}}^{i} E_{j}^{f} \leq b_{M}
+\end{equation} 
+
+\begin{equation}
+\label{eq:group_def_iso_lim}
+b_{m} \leq \sum \limits_{k}^{K} f_{I_{k}^{f}}^{i} I_{k}^{f} \leq b_{M} 
+\end{equation}
+
+The second principle relationship is the relative abundance limits between pairs
+of groups.
+Relative group abundance limits can be expressed as seen in equation
+\ref{eq:rto_ratio} where $r_{m/M}$ indicates a relative abundance minimum and
+maximum bound respectively.
+
+\begin{equation}
+\label{eq:rto_ratio}
+r_{m} \leq \frac{g_{1}}{g_{2}} \leq r_{M} 
+\end{equation}
+
+Equation \ref{eq:rto_ratio} can be expressed linearly as two inequalities as
+seen in equations \ref{eq:rto_min} and \ref{eq:rto_max}.
+
+\begin{equation}
+\label{eq:rto_min}
+-\infty \leq -g_{1} + r_{m}g_{2} \leq 0
+\end{equation}
+
+\begin{equation}
+\label{eq:rto_max}
+0 \leq -g_{1} + r_{M}g_{2} \leq \infty
+\end{equation}
+
+\subsection{Stream equations} \label{ssec:stream_eq}
+Taking $s_{l}$ to be stream $l$, $f_{x}^{l}$ to be the fractional abundance
+of component $x$ in stream $l$, $E_{j}^{d}$ to be the absolute change in the 
+relative abundance of element $j$ in the host material, and $I_{k}^{d}$ to be 
+the absolute change in the relative abundance of isotope $k$ in the host
+material the solution for the stream's relative abundance is seen in equations
+\ref{eq:stream_eq_ele} and \ref{eq:stream_eq_iso}.
+
+\begin{equation}
+\label{eq:stream_eq_ele}
+s_{l} = \sum \limits_{j}^{J} f_{E_{j}}^{d} E_{j}^{d}
+\end{equation}
+
+\begin{equation}
+\label{eq:stream_eq_iso}
+s_{l} = \sum \limits_{k}^{K} f_{I_{k}}^{d} I_{k}^{d}
+\end{equation}
+
+\subsection{Oxidation equations} \label{ssec:oxid_eq}
+The governing inequality for the oxidation table is seen in equation
+\ref{eq:oxi} where $O_{m/M}$ is the minimum and maximum averaged oxidation
+state bound for a material, $o_{E_{j}}$ is the average oxidation state of
+element $j$ in the host material, and $w_{E_{j}}$ is the optional weighting
+factor that can be applied to any element. 
+
+\begin{equation}
+\label{eq:oxi}
+O_{m} \leq \sum \limits_{j}^{J} w_{E_{j}} o_{E_{j}} E_{j} \leq O_{M}
+\end{equation}
+
+\subsection{Reactivity equations}
+Given lower and upper bounds for the multiplication factor of the system,
+$k_{eff}^{min}$ and $k_{eff}^{max}$ respectively equation \ref{eq:reac} can be 
+made linear as seen in equations \ref{eq:k_min} and \ref{eq:k_max}.
+
+\begin{equation}
+\label{eq:k_min}
+0 \geq \frac{k_{eff}^{min}}{(1 - p_{l})} \sum \limits_{k}^{K} \sigma_{a}^{k} I_{k} - \sum \limits_{k}^{K} \nu^{k} \sigma_{f}^{k} I_{k}
+\end{equation}
+
+\begin{equation}
+\label{eq:k_max}
+0 \leq \frac{k_{eff}^{max}}{(1 - p_{l})} \sum \limits_{k}^{K} \sigma_{a}^{k} I_{k} - \sum \limits_{k}^{K} \nu^{k} \sigma_{f}^{k} I_{k}
+\end{equation}
+
+\subsection{How to optimize}
+Equations \ref{eq:group_def_ele_lim} through \ref{eq:k_max} demonstrate that
+the governing equations of optimization for ADDER are linear. Given a linear
+set of equations, and a set which in various configurations could be
+under-constrained, over-constrained, or equal, the best optimization route is
+clear, linear optimization or linear programming as it is sometimes known.
+The benefits, computational efficiency and a one to one mapping of solutions
+to initial conditions, are desired traits in ADDER. The use of linear 
+optimization 
+does ask two questions; what is the optimization target and what linear
+optimization routine should be used. To answer the former ADDER allows the user
+to set the optimization direction, minimization or maximization, as well as
+the optimization target from which the user can select such options as; a
+specific group in a specific material, a specific stream, all material transfers,
+and other options. To solve the linear programming problem ADDER employs the
+CLP library \cite{lougee-heimer_common_2003}.
+
+\subsection{Building the matrix}
+The CLP library expects a linear programming matrix from ADDER - one built from
+all the constituent equations in the ADDER scheme. Before the equations 
+presented earlier in this section can be incorporated into the matrix a note
+about the effects of table-class streams should be made. As mentioned in section
+\ref{ssec:streams} table-class streams are prescriptions; the mass flows they
+stipulate are going to happen. This information makes it into the linear
+programming matrix in the form of adjustments to the bounds of equations
+and variables. These adjustments are denoted
+as $r_{x}$ where $r$ is the net positive increase in the fractional abundance of
+component $x$ as caused by all table-class streams. It should be noted that
+adjustments calculated for proportional removal table-class streams are only
+approximations, and sometimes poor approximations, of the actual amount of an
+isotope or element that will be removed as nuclear processes change the 
+abundance of isotopes in a way that ADDER is currently unaware of.
+
+Figure \ref{fig:opt_matrix}
+depicts the scheme for constructing the linear programming matrix. Column bounds
+are presented above the appropriate column while row bounds are presented to the
+left of the appropriate row. Below the column bounds are the variables which
+the columns represent and to the right of the row bounds are the equation
+number, if any, of the equation that row represents. For the sake of brevity
+the matrix in figure \ref{fig:opt_matrix} is for one material only, a one 
+material cluster. The only variables shared between materials are the
+group-class streams and the stream equations they are a part of are the only
+coupling equations; aside from transfers by table-class streams but those
+are only represented in the linear programming matrix, they are handled by
+other routines all together. If a second material were to be included in this
+matrix then, perhaps, the stream entries in the third and fourth columns would
+have non-zero coefficients for some $E_{j}^{d}$ and $I_{k}^{d}$ rows.
+
+Working down the matrix row by row the first row encountered represents equation
+\ref{eq:rto_min} with arbitrary groups $g_{1}$ and $g_{2}$ while the next row 
+down represents equation \ref{eq:rto_max}. The third row, what will be referred
+to as an ``elemental future", row represents the atom balance for element $j$.
+The novel column involved here is an elemental future column whose inclusion
+in the same row closes the equation. The lower bound on this column, 
+$e_{m}^{j}$, represents $0 - r_{E_{j}^{f}}$.
+The row bounds $\alpha$ and $\beta$ represent, respectively,
+$-\infty$ and $0 + r_{E_{j}^{f}}$. These are the bounds for an
+``uncontrolled" element or those elements which are permitted to have portions
+of the element not tied up in declared group structures. 
+The upper bound is met in the trivial case,
+where all terms are zero, and in the case of material injection containing
+element $j$. In this instance the group contributions to the equation may be
+larger than $E_{j}^{f}$ which would push the result of the equation to be
+greater than 0 indicating a lack of $E_{j}^{f}$ - except that the missing amount
+of $E_{j}^{f}$ will be brought in by table-class streams that the linear
+programming matrix is, otherwise, unaware of. For ``controlled" elements
+$\alpha$ and $\beta$ are both equal to $0 + r_{E_{j}^{f}}$, the abundance of 
+element $k$ must be accounted for entirely by its presence in group structures.
+The fourth row, an ``elemental
+delta" row, represents the change in the fractional abundance of element $j$
+as caused by all group-class streams. Of course the elemental delta column 
+is involved to close the balance. The fifth row, or ``balance" row, is what ties
+together $E_{j}^{f}$ and $E_{j}^{d}$. The bounds, $\gamma$ and $\delta$,
+are equal and represent $E_{j}^{c} - r_{E_{j}^{f}}$ constituting an atom
+balance \textit{in time} where $E_{j}^{c}$ represents the present fractional
+abundance of element $j$. The fifth row requires, straightforwardly, that the
+``future" amount of an element be equal to the current amount plus any ``delta",
+or change, in the element's abundance. The sixth row is an isotopic balance row
+requiring that the abundance of an element be equal to the abundance of its
+constituent isotopes. $\epsilon$ is defined in equation \ref{eq:epsilon_def}
+where $I_{k,E}$ represents an isotope $k$ which is also a member of 
+element $E$. 
+The following three rows, the seventh, eighth, and ninth,
+are the isotopic versions of the elemental future, delta, and balance rows.
+$\zeta$ represents
+$0 + r_{I_{k}^{f}}$; $i_{M}^{k}$ represents
+$0 - r_{I_{k}^{f}}$ ; while $\eta$ and $\theta$ are
+equal and represent $I_{k}^{c} - r_{I_{k}^{c}}$ where $I_{k}^{c}$ represents
+the present fractional abundance of isotope $k$. In the tenth and eleventh rows
+equations \ref{eq:k_min} and \ref{eq:k_max} find representation with $\iota$
+and $\kappa$ respectively representing terms of the expanded sum found in the
+referenced equations; $\frac{k_{eff}^{min}}{(1-p_{l})} \sigma_{a}^{k} - \nu^{k}
+\sigma_{f}^{k}$ and
+$\frac{k_{eff}^{max}}{(1-p_{l})} \sigma_{a}^{k} - \nu^{k}
+\sigma_{f}^{k}$. Table-class stream effects on reactivity are captured in
+$\Lambda$ and $\mu$ as seen in equations \ref{eq:Lambda_bound} and
+\ref{eq:mu_bound} respectively. In the twelfth row $\xi$ and $\tau$ capture
+the effects of table-class streams as seen in equations \ref{eq:xi_bound} and
+\ref{eq:tau_bound} respectively. The thirteenth row, or ``pres" row, exists
+when the user instructs ADDER to conserve the number of mols in a material. The
+pres row requires that the net stream transfers in a material come to zero. The
+effects of table-class streams are captured in $\upsilon$ and $\omega$ as seen
+in equation \ref{eq:upsilon_bound} where $s^{t}$ is a table class stream 
+abundance value. The final row is the optimization, or ``Opt", row. This row
+indicates to the simplex routine which variables to minimize or maximize. In
+figure \ref{fig:opt_matrix} the opt row is indicating that $g_{1}$ is the
+optimization target. ADDER gives many options to the user for optimization
+targets; specific groups, specific streams, sets of streams, specific elements,
+specific isotopes, and many others.
+
+    \begin{equation}
+    \label{fig:opt_matrix}
+        \centering
+        \begin{blockarray}{cccccccccc}
+                               &                   & [b_{m},b_{M}]     &
+            [0, \infty)        & (-\infty,\infty)  & (-\infty,\infty)  &
+            [e_{m}^{j}, \infty)& (-\infty,\infty)  & [i_{m}^{j},\infty)&
+            (-\infty,\infty)  \\ 
+                               &                   & g_{1}             &
+            g_{2}              & s_{1}             & s_{2}             &
+            E_{j}^{f}          & E_{j}^{d}         & I_{k}^{f}         &
+            I_{k}^{d} \\
+                               &                   &                   &
+                               &                   &                   &
+                               &                   &                   &
+             \\ 
+            \begin{block}{cc[cccccccc]}
+            {(-\infty,0]}      & \text{Eq.}\ref{eq:rto_min} & -1       &
+            r_{m}              &                   &                   &
+                               &                   &                   &
+             \\
+            {[0,\infty)}       & \text{Eq.}\ref{eq:rto_max} & -1       &
+            r_{M}              &                   &                   &
+                               &                   &                   &
+             \\
+            {[\alpha,\beta]}   & E_{j}^{f}   & f_{E_{j}^{f}}^{1} &
+            f_{E_{j}^{f}}^{2}  &                   &                   &
+            -1                 &                   &                   &
+             \\
+            {[0,0]}            & E_{j}^{d}         &                   &
+                               & f_{E_{j}^{f}}^{1} & f_{E_{j}^{f}}^{2} &
+                               & -1                &                   &
+             \\
+            {[\gamma, \delta]} 
+                               & E_{j}^{b}         &                   &
+                               &                   &                   &
+            1                  & -1                &                   &
+             \\
+            {[\epsilon,\epsilon]}& E_{j}^{i}       &                   &
+                               &                   &                   &
+            -1                 &                   & 1                 &
+             \\
+            {(-\infty,\zeta]} & I_{k}^{f}         & f_{I_{k}^{f}}^{1} &
+            f_{I_{k}^{f}}^{2}  &                   &                   &
+                               &                   & -1                &
+             \\
+            {[0,0]}            & I_{k}^{d}         &                   &
+                               & f_{I_{k}^{f}}^{1} & f_{I_{k}^{f}}^{2} &
+                               &                   &                   &
+            -1 \\
+            {[\eta, \theta]}
+                               & I_{k}^{b}         &                   &
+                               &                   &                   &
+                               &                   & 1                 &
+            -1 \\ 
+            {[\Lambda, \infty)} & \text{Eq.}\ref{eq:k_max}&            &
+                               &                   &                   &
+                               &                   & \iota             &
+             \\
+            {(-\infty, \mu]}   & \text{Eq.}\ref{eq:k_min} &            &
+                               &                   &                   &
+                               &                   & \kappa            & 
+             \\
+            {[\xi,\tau]}    & \text{Eq.}\ref{eq:oxi} &                 &
+                               &                   &                   &
+             o_{E_{j}^{f}}     &                   &                   &
+             \\
+            {[\upsilon,\omega]} & \text{Pres}      &                   &
+                               & 1                 & 1                 &
+                               &                   &                   &
+             \\
+                               & \text{Opt}        & 1                 &
+                               &                   &                   &
+                               &                   &                   &
+             \\
+            \end{block}
+        \end{blockarray}
+    \end{equation}
+
+\begin{equation}
+\label{eq:epsilon_def}
+\epsilon = \sum \limits_{k}^{K} I_{k,E} r_{I_{k,E}^{f}}
+\end{equation}
+
+\begin{equation}
+\label{eq:Lambda_bound}
+\Lambda = \sum \limits_{k}^{K} \nu^{k} \sigma_{f}^{k} r_{I_{k}^{f}} -
+    \frac{k_{eff}^{min}}{(1 - p_{l})} \sum \limits_{k}^{K} \sigma_{a}^{k}
+    r_{I_{k}^{f}}
+\end{equation}
+
+\begin{equation}
+\label{eq:mu_bound}
+\mu = \sum \limits_{k}^{K} \nu^{k} \sigma_{f}^{k} r_{I_{k}^{f}} -
+    \frac{k_{eff}^{max}}{(1 - p_{l})} \sum \limits_{k}^{K} \sigma_{a}^{k}
+    r_{I_{k}^{f}}
+\end{equation}
+
+\begin{equation}
+\label{eq:xi_bound}
+\xi = O_{m} - \sum \limits_{j}^{J} w_{E_{j}} o_{E_{j}} r_{E_{j}^{f}}
+\end{equation}
+
+\begin{equation}
+\label{eq:tau_bound}
+\tau = O_{M} - \sum \limits_{j}^{J} w_{E_{j}} o_{E_{j}} r_{E_{j}^{f}}
+\end{equation}
+
+\begin{equation}
+\label{eq:upsilon_bound}
+\upsilon = \omega = -\sum \limits_{s'}^{S'} s_{s'}^{t}
+\end{equation}
+
+\subsection{Solving the matrix} \label{ssec:solving}
+ADDER builds the matrix seen in figure \ref{fig:opt_matrix} and passes this
+matrix to CLP. CLP solves the linear programming problem and returns back a
+vector containing the value of the objective function as well as the values
+all the variables take in the optimal solution. The critical information from
+this process are the values of the stream abundances.
+
+\section{Burning the Material}
+Following the solution of the optimization problem discrete type streams have
+their effects applied before the burnup step begins. A monte-carlo simulation is
+then run and if the multiplication factor is outside of the user defined bounds
+and iterations remain, as set by the user, another optimization solve will be
+executed except the changes already made by discrete type streams remain. 
+Beyond this the effects that ADDER has are to modify the burnup matrix inside of
+SERPENT 2 to reflect the effects of streams. The coefficients in the burnup
+matrix are those in the Bateman equation as seen in equation \ref{eq:Bateman}
+where $N$ is the number density of nuclide $n$, $\vec{r}$ is the position at
+which the nuclide density is taken, $t$ is time, $b_{m \to n}$ is the branching ratio for the decay of nuclide $m$ into $n$, $\lambda$ is the decay constant
+for its sub-scripted nuclide,
+$q$ goes over all neutron induced absorption reactions for a given isotope, 
+$a_{m \to n}^{q}(E)$ is the branching ratio for isotope $m$ into $n$ due to
+reaction $q$ at energy $E$,  $\sigma_{x}^{y}(E)$ is the microscopic
+cross section of reaction $x$ for isotope $y$ at energy $E$, $\phi$ is the
+scalar neutron flux, $d$ denotes all
+transmutation reactions for a given isotope, $R_{n}(\vec{r},t)$ is a
+fractional removal (or addition) rate for isotope $n$ at position $\vec{r}$ at
+time $t$, and $F_{n}(\vec{r},t)$ is a feed (or removal) amount for isotope
+$n$ at position $\vec{r}$ at time $t$. 
+
+A highly truncated burnup scheme can be
+seen in figure \ref{fig:burn_matrix} in which there are two isotopes,
+\ce{^{233}U} and \ce{^{135}Xe}, and two streams; $S_{c}$ representing a
+``continuous" stream with a constant injection rate and $S_{p}$ representing a
+``proportional" stream with a transfer rate dependent upon the concentration
+of the substances to be transferred. There are, of course, two matrices as well.
+The burnup matrix to the left holding the coefficients of the Bateman equation
+and the second, to the right, holding the initial concentrations of isotopes
+and the values for the streams. The first column of the first row gives
+the creation and destruction of \ce{^{233}U} which is dependant on the
+concentration of \ce{^{233}U} with $\Gamma$ representing nuclear destruction as
+seen in equation \ref{eq:Gamma_def}. The third column of the first row holds
+the fraction of stream $S_{c}$ that \ce{^{233}U} comprises. These entries
+together describe the evolution of \ce{^{233}U} in the given system. In the
+second row $\Xi$, as seen in equation \ref{eq:Xi_def}, represents the production
+of \ce{^{135}Xe} from \ce{^{233}U}. In the second column of the second row are
+the processes dependant on the concentration of \ce{^{135}Xe}. $\Upsilon$
+represents the proportional rate constant as determined by the multiplication
+of $c_{\ce{^{135}Xe}}^{t}$ and $c^{s}$ while $\Theta$ is given by equation
+\ref{eq:Theta_def}. The third row is blank as the abundance of a continuous type
+stream, $h_{S_{c}}$, does not change over a burn step. The fourth row is an
+addition specific to ADDER and not found in the Bateman equations; rather, this
+line, and the lines it represents, exists to keep track of the amount of an
+isotope that a proportional stream moves simply to have this information to give
+to the user. The system of matrices seen in figure \ref{fig:burn_matrix} is
+solved by SERPENT providing updated isotopic abundances and proportional stream
+transfer amounts.
+
+    \begin{equation}
+    \label{eq:Bateman}
+    \begin{split}
+        \frac{\partial N_{n}(\vec{r},t)}{\partial t} = & \sum \limits_{m}^{M} 
+        b_{m \rightarrow n} \lambda_{j} N_{j}(\vec{r}, t) + \\
+        & \sum \limits_{m}^{M}
+        \sum \limits_{q}^{Q} \int_{0}^{\infty} a_{k \rightarrow i}^{q}(E)
+        \sigma_{q}^{k}(E) \phi(\vec{r},E,t) N_{k}(\vec{r},t)\mathrm{d}E - \\
+        & N_{n}(\vec{r},t) \lambda_{i} - \sum \limits_{d}^{D} \int_{0}^{\infty}
+        \sigma_{d}^{n}(E) \phi(\vec{r},E,t) N_{n}(\vec{r},t)\mathrm{d}E - \\
+        & R_{n}(\vec{r},t) N_{n}(\vec{r},t) + F_{n}(\vec{r},t)
+    \end{split}
+    \end{equation}
+
+    \begin{equation}
+    \label{fig:burn_matrix}
+        \begin{blockarray}{cccccc}
+             &
+            \ce{^{233}U} &
+            \ce{^{135}Xe} &
+            S_{c} &
+            S_{p} &
+            \mathbb{N} \\
+             &
+             &
+             &
+             &
+             &
+             \\ 
+        \begin{block}{c[cccc][c]}
+            \ce{^{233}U} &
+            -\lambda_{\ce{^{233}U}} + \Gamma &
+             &
+            f^{S_{c}}_{\ce{^{233}U}} &
+             &
+            N_{\ce{^{233}U}} \\
+            \ce{^{135}Xe} &
+            \Xi &
+            -\lambda_{\ce{^{135}Xe}} + \Upsilon + \Theta &
+             &
+             &
+            N_{\ce{^{135}Xe}} \\
+            S_{c} &
+             &
+             &
+             &
+             &
+            h_{S_{c}} \\
+            S_{p} &
+             &
+             \Upsilon &
+             &
+             &
+             1\\
+        \end{block}
+        \end{blockarray}
+    \end{equation}
+
+\begin{equation}
+\label{eq:Gamma_def}
+\Gamma = - \sum \limits_{d}^{D} \sigma_{d}^{\ce{^{233}U}} \phi
+\end{equation}
+
+\begin{equation}
+\label{eq:Xi_def}
+\Xi = b_{\ce{^{233}U} \rightarrow \ce{^{135}Xe}} \lambda_{\ce{^{233}U}} + \sum
+\limits_{q}^{Q} a_{\ce{^{233}U} \rightarrow \ce{^{135}Xe}} \sigma_{q}^{
+\ce{^{233}U}} \phi
+\end{equation}
+
+\begin{equation}
+\label{eq:Theta_def}
+\Theta = - \sum \limits_{d}^{D} \sigma_{d}^{\ce{^{135}Xe}} \phi
+\end{equation}
+
+\section{Iterating to the Solution} \label{sec:iter}
+The Bateman equation, \ref{eq:Bateman}, is not a standalone description of the
+isotopic evolution of a nuclear system; rather, it is tightly coupled with the
+scalar neutron flux. Considering that the solution of the system of matrices
+in figure \ref{fig:burn_matrix} does not solve for the scalar neutron flux
+it is clear that the solution, if for nothing else, is an approximation. Many
+nuclear material evolution schemes iterate between solutions of the neutron
+flux and the Bateman equations within the same burnup step - SERPENT 2 is no 
+different. While the purpose of
+this paper is not to investigate the burnup solution routines of SERPENT, those
+can be seen in \cite{leppanen_burnup_2009}, the iteration scheme employed by
+these routines could affect ADDER. In truth, ADDER is compatible with any
+iteration scheme employed by SERPENT 2 due in part to a limitation of ADDER -
+due to the mix of continuous and discrete streams convergence of an iteration
+scheme for optimization involving nuclear processes on the fuel is impossible 
+to guarantee. At
+the present time ADDER only iterates to check the reactivity component of its
+solution. These iterations happen at the beginning of every burn step in which
+the Bateman equations will be solved. Other than these actions, ADDER does not
+interact with SERPENT 2 burnup iterations schemes.
+
+\section{Conclusion} \label{sec:conc}
+The current state of nuclear materials evolution methods is lacking; both in
+the ability to handle material flows and in the ability to determine the correct
+material flows. ADDER has been presented as a step in the right direction
+towards addressing these concerns. ADDER, a source code modification to
+SERPENT 2, does improve on the current state
+in the diversity of the material transfers it allows, in the diversity of
+the material transferred that it allows, and in the optimization of these
+material flows according to a wide array of constraints; yet, like all methods,
+ADDER has its limitations. ADDER is not a full chemistry simulation suite, it
+barely scratches the surface of the complex chemical relationships that exist 
+in many nuclear systems. Furthermore, ADDER effectively ignores the coupling 
+between the nuclear evolution problem and the optimization problem. Despite
+these shortcomings ADDER is expected to contribute significantly to MSR fuel
+evolution modelling and possibly to a lesser extent other nuclear modelling
+situations involving material flows such as geologic repository or
+fuel fabrication facility analysis. 
+
+\section*{References}
+
+\bibliography{theory}
+
+\end{document}
