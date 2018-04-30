@@ -522,7 +522,7 @@ about the effects of table-class streams should be made. As mentioned in section
 stipulate are going to happen. This information makes it into the linear
 programming matrix in the form of adjustments to the bounds of equations
 and variables. These adjustments are denoted
-as $r_{x}$ where $r$ is the net positive increase in the fractional abundance of
+as $r_{x}$ where $r$ is the net positive increase in the abundance of
 component $x$ as caused by all table-class streams. It should be noted that
 adjustments calculated for proportional removal table-class streams are only
 approximations, and sometimes poor approximations, of the actual amount of an
@@ -611,7 +611,7 @@ specific isotopes, and many others.
         \centering
         \begin{blockarray}{cccccccccc}
                                &                   & [b_{m},b_{M}]     &
-            [0, \infty)        & (0,\infty)        & (0,\infty)  &
+            [0, \infty)        & [0,\infty)        & [0,\infty)  &
             [e_{m}^{j}, \infty)& (-\infty,\infty)  & [i_{m}^{j},\infty)&
             (-\infty,\infty)  \\ 
                                &                   & g_{1}             &
@@ -723,8 +723,35 @@ specific isotopes, and many others.
 ADDER builds the matrix seen in figure \ref{fig:opt_matrix} and passes this
 matrix to CLP. CLP solves the linear programming problem and returns back a
 vector containing the value of the objective function as well as the values
-all the variables take in the optimal solution. The critical information from
-this process are the values of the stream abundances.
+all the variables take in the optimal solution. The key pieces of information 
+from this process are the values of the stream abundances. However, these
+stream abundance values are burdened by two key limitations both related the
+time-independace of the linear optimization problem. 
+
+The first limitation can be entirely avoided if all streams in a given
+simulation have identical behavior in time. If streams with differing behavior
+in time affect a common material the optimization solution may not be true at
+any or all points in time for that solution interval. In a simple example
+imagine that material A requires four parts fluorine from stream B and one part
+uranium from stream C. Take stream B to be a discrete type stream and stream C
+to be a continuous type stream. Neglecting any nuclear depletion the optimal
+composition will not be realized until the end of the burnup step when stream C
+has delivered all of its uranium. Additionally, a previously unexpected amount
+of fluoride without any corresponding uranium will appear in the material 
+suddenly when the effects of stream B are applied.
+Simulations involving streams with mixed time
+behavior may find recourse with shorter burnup steps but mixing streams with
+differing time behavior is ill-advised in general.
+
+The second limitaiton arrises from the effects of nuclear depletion. Should
+nuclear depletion act upon a constituent of the linear optimization solution
+the solution may not hold following the effects of nuclear depletion. This
+limitation will be most strongly felt in simulations for which an isotope
+with a large rate of change in its concentration is also a key constituent of
+an optimization problem, particuarly one with less flexible constraints. Shorter
+burnup steps which minimize the integrated effect of an isotope's rate of change
+may reduce the degree to which the actual composition diverges from the ideal
+composition.
 
 \section{Burning the Material}
 Following the solution of the optimization problem discrete type streams have
