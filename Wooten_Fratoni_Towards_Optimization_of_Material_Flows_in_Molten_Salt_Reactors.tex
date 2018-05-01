@@ -206,8 +206,8 @@ modelling environment.
 
 In section \ref{sec:structure} the components of ADDER will be introduced and elaborated
 upon as well as their specific applicability to MSR modelling. Following, in
-section REF\_NEEDED, the algorithmic underpinnings of ADDER will be elaborated
-upon followed up with concluding remarks.
+section \ref{sec:burn} , the algorithmic underpinnings of ADDER will be 
+elaborated upon followed up with concluding remarks.
 
 \section{Defining the Structure} \label{sec:structure}
 ADDER is composed of various structures and these structures bring functionality
@@ -549,52 +549,39 @@ Working down the matrix row by row the first row encountered represents equation
 down represents equation \ref{eq:rto_max}. The third row, what will be referred
 to as an ``elemental future", row represents the atom balance for element $j$.
 The novel column involved here is an elemental future column whose inclusion
-in the same row closes the equation. The lower bound on this column, 
-$e_{m}^{j}$, represents $0 - r_{E_{j}^{f}}$.
-The row bounds $\alpha$ and $\beta$ represent, respectively,
-$-\infty$ and $0 + r_{E_{j}^{f}}$. These are the bounds for an
+in the same row closes the equation.  
+The bounds for this row are those for an
 ``uncontrolled" element or those elements which are permitted to have portions
-of the element not tied up in declared group structures. 
-The upper bound is met in the trivial case,
-where all terms are zero, and in the case of material injection containing
-element $j$. In this instance the group contributions to the equation may be
-larger than $E_{j}^{f}$ which would push the result of the equation to be
-greater than 0 indicating a lack of $E_{j}^{f}$ - except that the missing amount
-of $E_{j}^{f}$ will be brought in by table-class streams that the linear
-programming matrix is, otherwise, unaware of. For ``controlled" elements
-$\alpha$ and $\beta$ are both equal to $0 + r_{E_{j}^{f}}$, the abundance of 
-element $k$ must be accounted for entirely by its presence in group structures.
+of the element not tied up in declared group structures. In the case of a
+``controlled" element, those who's complete abudance must be accounted for by
+group structures, the lower bound is changed to zero. 
 The fourth row, an ``elemental
 delta" row, represents the change in the fractional abundance of element $j$
 as caused by all group-class streams. Of course the elemental delta column 
 is involved to close the balance. The fifth row, or ``balance" row, is what ties
-together $E_{j}^{f}$ and $E_{j}^{d}$. The bounds, $\gamma$ and $\delta$,
+together $E_{j}^{f}$ and $E_{j}^{d}$. The bounds, $\alpha$ and $\beta$,
 are equal and represent $E_{j}^{c} + r_{E_{j}^{f}}$ constituting an atom
 balance \textit{in time} where $E_{j}^{c}$ represents the present fractional
 abundance of element $j$. The fifth row requires, straightforwardly, that the
 ``future" amount of an element be equal to the current amount plus any ``delta",
 or change, in the element's abundance. The sixth row is an isotopic balance row
 requiring that the abundance of an element be equal to the abundance of its
-constituent isotopes. $\epsilon$ is defined in equation \ref{eq:epsilon_def}
-where $I_{k,E}$ represents an isotope $k$ which is also a member of 
-element $E$. 
+constituent isotopes. 
 The following three rows, the seventh, eighth, and ninth,
 are the isotopic versions of the elemental future, delta, and balance rows.
-$\zeta$ represents
-$0 + r_{I_{k}^{f}}$; $i_{M}^{k}$ represents
-$0 - r_{I_{k}^{f}}$ ; while $\eta$ and $\theta$ are
+$\gamma$ and $\delta$ are
 equal and represent $I_{k}^{c} + r_{I_{k}^{c}}$ where $I_{k}^{c}$ represents
 the present fractional abundance of isotope $k$. In the tenth and eleventh rows
-equations \ref{eq:k_min} and \ref{eq:k_max} find representation with $\iota$
-and $\kappa$ respectively representing terms of the expanded sum found in the
+equations \ref{eq:k_max} and \ref{eq:k_min} find representation with $\eta$
+and $\theta$ respectively representing terms of the expanded sum found in the
 referenced equations; $\frac{k_{eff}^{min}}{(1-p_{l})} \sigma_{a}^{k} - \nu^{k}
 \sigma_{f}^{k}$ and
 $\frac{k_{eff}^{max}}{(1-p_{l})} \sigma_{a}^{k} - \nu^{k}
-\sigma_{f}^{k}$. Table-class stream effects on reactivity are captured in
-$\Lambda$ and $\mu$ as seen in equations \ref{eq:Lambda_bound} and
-\ref{eq:mu_bound} respectively. In the twelfth row $\xi$ and $\tau$ capture
-the effects of table-class streams as seen in equations \ref{eq:xi_bound} and
-\ref{eq:tau_bound} respectively. The thirteenth row, or ``pres" row, exists
+\sigma_{f}^{k}$. 
+The twelfth row representes equation \ref{eq:oxi}, accounting for the
+contributions of the future quantity of elements to a material's averaged
+oxidation state.
+The thirteenth row, or ``pres" row, exists
 when the user instructs ADDER to conserve the number of mols in a material. The
 pres row requires that the net stream transfers in a material come to zero. The
 effects of table-class streams are captured in $\upsilon$ and $\omega$ as seen
@@ -611,8 +598,8 @@ specific isotopes, and many others.
         \centering
         \begin{blockarray}{cccccccccc}
                                &                   & [b_{m},b_{M}]     &
-            [0, \infty)        & [0,\infty)        & [0,\infty)  &
-            [e_{m}^{j}, \infty)& (-\infty,\infty)  & [i_{m}^{j},\infty)&
+            [0, \infty)        & [0,\infty)        & [0,\infty)        &
+            [0, \infty)        & (-\infty,\infty)  & [0,\infty)        &
             (-\infty,\infty)  \\ 
                                &                   & g_{1}             &
             g_{2}              & s_{1}             & s_{2}             &
@@ -631,7 +618,7 @@ specific isotopes, and many others.
             r_{M}              &                   &                   &
                                &                   &                   &
              \\
-            {[\alpha,\beta]}   & E_{j}^{f}   & f_{E_{j}^{f}}^{1} &
+            {(-\infty,0]}      & E_{j}^{f}   l     & f_{E_{j}^{f}}^{1} &
             f_{E_{j}^{f}}^{2}  &                   &                   &
             -1                 &                   &                   &
              \\
@@ -639,16 +626,16 @@ specific isotopes, and many others.
                                & f_{E_{j}^{f}}^{1} & f_{E_{j}^{f}}^{2} &
                                & -1                &                   &
              \\
-            {[\gamma, \delta]} 
+            {[\alpha, \beta]} 
                                & E_{j}^{b}         &                   &
                                &                   &                   &
             1                  & -1                &                   &
              \\
-            {[\epsilon,\epsilon]}& E_{j}^{i}       &                   &
+            {[0,0]}            & E_{j}^{i}         &                   &
                                &                   &                   &
             -1                 &                   & 1                 &
              \\
-            {(-\infty,\zeta]} & I_{k}^{f}         & f_{I_{k}^{f}}^{1} &
+            {(-\infty,0]}      & I_{k}^{f}         & f_{I_{k}^{f}}^{1} &
             f_{I_{k}^{f}}^{2}  &                   &                   &
                                &                   & -1                &
              \\
@@ -656,20 +643,20 @@ specific isotopes, and many others.
                                & f_{I_{k}^{f}}^{1} & f_{I_{k}^{f}}^{2} &
                                &                   &                   &
             -1 \\
-            {[\eta, \theta]}
+            {[\gamma, \delta]}
                                & I_{k}^{b}         &                   &
                                &                   &                   &
                                &                   & 1                 &
             -1 \\ 
-            {[\Lambda, \infty)} & \text{Eq.}\ref{eq:k_max}&            &
+            {[0, \infty)}      & \text{Eq.}\ref{eq:k_max}&             &
                                &                   &                   &
-                               &                   & \iota             &
+                               &                   & \eta             &
              \\
-            {(-\infty, \mu]}   & \text{Eq.}\ref{eq:k_min} &            &
+            {(-\infty, 0]}     & \text{Eq.}\ref{eq:k_min} &            &
                                &                   &                   &
-                               &                   & \kappa            & 
+                               &                   & \theta            & 
              \\
-            {[\xi,\tau]}    & \text{Eq.}\ref{eq:oxi} &                 &
+            {[O_{m},O_{M}]}    & \text{Eq.}\ref{eq:oxi} &              &
                                &                   &                   &
              o_{E_{j}^{f}}     &                   &                   &
              \\
@@ -684,35 +671,6 @@ specific isotopes, and many others.
             \end{block}
         \end{blockarray}
     \end{equation}
-
-\begin{equation}
-\label{eq:epsilon_def}
-\epsilon = \sum \limits_{k}^{K} I_{k,E} r_{I_{k,E}^{f}}
-\end{equation}
-
-\begin{equation}
-\label{eq:Lambda_bound}
-\Lambda = \sum \limits_{k}^{K} \nu^{k} \sigma_{f}^{k} r_{I_{k}^{f}} -
-    \frac{k_{eff}^{min}}{(1 - p_{l})} \sum \limits_{k}^{K} \sigma_{a}^{k}
-    r_{I_{k}^{f}}
-\end{equation}
-
-\begin{equation}
-\label{eq:mu_bound}
-\mu = \sum \limits_{k}^{K} \nu^{k} \sigma_{f}^{k} r_{I_{k}^{f}} -
-    \frac{k_{eff}^{max}}{(1 - p_{l})} \sum \limits_{k}^{K} \sigma_{a}^{k}
-    r_{I_{k}^{f}}
-\end{equation}
-
-\begin{equation}
-\label{eq:xi_bound}
-\xi = O_{m} - \sum \limits_{j}^{J} w_{E_{j}} o_{E_{j}} r_{E_{j}^{f}}
-\end{equation}
-
-\begin{equation}
-\label{eq:tau_bound}
-\tau = O_{M} - \sum \limits_{j}^{J} w_{E_{j}} o_{E_{j}} r_{E_{j}^{f}}
-\end{equation}
 
 \begin{equation}
 \label{eq:upsilon_bound}
@@ -753,7 +711,7 @@ burnup steps which minimize the integrated effect of an isotope's rate of change
 may reduce the degree to which the actual composition diverges from the ideal
 composition.
 
-\section{Burning the Material}
+\section{Burning the Material} \label{sec:burn}
 Following the solution of the optimization problem discrete type streams have
 their effects applied before the burnup step begins. A monte-carlo simulation is
 then run and if the multiplication factor is outside of the user defined bounds
