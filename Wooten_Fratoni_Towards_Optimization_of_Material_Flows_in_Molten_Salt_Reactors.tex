@@ -267,8 +267,8 @@ defining how all of these elements will bond with one another the ``oxidation
 table" structure is provided. In the oxidation table structure a complete list
 of elements with their expected average oxidation state in the desired
 material is given; optionally a weight may also be applied to any element. To complete this setup a material is also given a target
-oxidation state which the weighted average of the elemental oxidation states in
-the material should meet.
+oxidation state which the weighted sum of the elemental oxidation states in
+the material.
 It is suspected that this feature will greatly ease the
 burden on most MSR simulations as most proposed fuel salts have a dominant
 anion which bonds with near everything else to the exclusion of other
@@ -471,7 +471,7 @@ s_{l} = \sum \limits_{k}^{K} f_{I_{k}}^{d} I_{k}^{d}
 
 \subsection{Oxidation equations} \label{ssec:oxid_eq}
 The governing inequality for the oxidation table is seen in equation
-\ref{eq:oxi} where $O_{m/M}$ is the minimum and maximum averaged oxidation
+\ref{eq:oxi} where $O_{m/M}$ is the minimum and maximum oxidation
 state bound for a material, $o_{E_{j}}$ is the average oxidation state of
 element $j$ in the host material, and $w_{E_{j}}$ is the optional weighting
 factor that can be applied to any element. 
